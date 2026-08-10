@@ -1,10 +1,22 @@
 <?php
-// Handle CORS for Cross-Origin Requests (Vercel Frontend -> Local/Live PHP)
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-header("Access-Control-Allow-Origin: $origin");
+// Handle Dynamic CORS for Credentials-based Requests
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+$allowed_origins = [
+    'http://localhost:5173',
+    'https://posta-xi-three.vercel.app'
+];
+
+if (in_array($origin, $allowed_origins, true)) {
+    header("Access-Control-Allow-Origin: $origin");
+} else {
+    // Default fallback to your live deployment URL instead of '*'
+    header("Access-Control-Allow-Origin: https://posta-xi-three.vercel.app");
+}
+
+header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Access-Control-Allow-Credentials: true");
 
 // Handle OPTIONS preflight request immediately
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

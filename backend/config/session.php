@@ -2,10 +2,49 @@
 // Clear any active output buffer
 if (ob_get_length()) ob_clean();
 
-// Secure session configuration
+// Dynamic CORS Configuration
+$allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'https://posta-xi-three.vercel.app' // Added Vercel live domain
+];
+
+$requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+if (in_array($requestOrigin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: " . $requestOrigin);
+} else {
+    // Dynamic fallback for ngrok or missing origins during development
+    header("Access-Control-Allow-Origin: " . ($requestOrigin ?: "https://posta-xi-three.vercel.app"));
+}
+
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Content-Type: application/json; charset=UTF-8");
+
+// Handle preflight OPTIONS requests immediately
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Secure Cross-Origin Session Configuration
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
+
+    // Configures cookies to work cross-site over HTTPS
+    session_set_cookie_params([
+        'lifetime' => 86400 * 7,
+        'path' => '/',
+        'domain' => '', 
+        'secure' => true,     // Must be true over HTTPS (ngrok / live host)
+        'httponly' => true,
+        'samesite' => 'None'  // Mandatory for Vercel -> PHP cross-site requests
+    ]);
+
     session_start();
 }
 
@@ -20,30 +59,6 @@ set_exception_handler(function ($e) {
     ]);
     exit();
 });
-
-// Dynamic CORS Configuration
-$allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173'
-];
-
-if (isset($_SERVER['HTTP_ORIGIN']) && in_array($_SERVER['HTTP_ORIGIN'], $allowedOrigins)) {
-    header("Access-Control-Allow-Origin: " . $_SERVER['HTTP_ORIGIN']);
-} else {
-    header("Access-Control-Allow-Origin: http://localhost:5173");
-}
-
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Content-Type: application/json; charset=UTF-8");
-
-// Handle preflight OPTIONS requests
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
 
 // Authentication middleware check
 function checkAuth() {
