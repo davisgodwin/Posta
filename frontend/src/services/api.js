@@ -5,10 +5,13 @@ export const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Crucial for cross-origin session cookies
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': '69420', // Bypasses ngrok landing page on mobile
+    'ngrok-skip-browser-warning': 'true',
+  },
+  params: {
+    'ngrok-skip-browser-warning': 'true', // Query parameter fallback for mobile Safari/Chrome
   },
 });
 

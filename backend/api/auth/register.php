@@ -1,34 +1,26 @@
 <?php
-// Handle Dynamic CORS for Credentials-based Requests
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+// 1. MUST BE FIRST: Load session and global CORS configuration
+require_once '../../config/session.php';
+require_once '../../config/database.php';
 
-$allowed_origins = [
-    'http://localhost:5173',
-    'https://posta-xi-three.vercel.app'
-];
+// 2. Allow custom ngrok and frontend headers explicitly for preflights
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning");
 
-if (in_array($origin, $allowed_origins, true)) {
-    header("Access-Control-Allow-Origin: $origin");
-} else {
-    // Default fallback to your live deployment URL instead of '*'
-    header("Access-Control-Allow-Origin: https://posta-xi-three.vercel.app");
-}
-
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-// Handle OPTIONS preflight request immediately
+// 3. Handle OPTIONS preflight immediately
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
+// 4. Ensure request is POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(["success" => false, "message" => "Method Not Allowed. Expected POST."]);
+    exit();
+}
+
 header("Content-Type: application/json");
 ini_set('display_errors', '0');
-
-require_once '../../config/database.php';
-require_once '../../config/session.php';
 
 $data = json_decode(file_get_contents("php://input"), true);
 
