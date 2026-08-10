@@ -1,8 +1,31 @@
 <?php
+// Handle CORS for Cross-Origin Requests (Vercel Frontend -> Local/Live PHP)
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+header("Access-Control-Allow-Origin: $origin");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Access-Control-Allow-Credentials: true");
+
+// Handle OPTIONS preflight request immediately
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+header("Content-Type: application/json");
+ini_set('display_errors', '0');
+
 require_once '../../config/database.php';
 require_once '../../config/session.php';
 
 $data = json_decode(file_get_contents("php://input"), true);
+
+// Fallback check if body wasn't JSON formatted
+if (!$data) {
+    http_response_code(400);
+    echo json_encode(["success" => false, "message" => "Invalid request payload."]);
+    exit();
+}
 
 $name = trim($data['name'] ?? '');
 $username = trim($data['username'] ?? '');
@@ -10,7 +33,7 @@ $email = trim($data['email'] ?? '');
 $password = $data['password'] ?? '';
 $confirm_password = $data['confirmPassword'] ?? '';
 
-// Validation
+// Input Validations
 if (empty($name) || empty($username) || empty($email) || empty($password)) {
     http_response_code(400);
     echo json_encode(["success" => false, "message" => "All fields are required."]);
@@ -35,40 +58,50 @@ if (strlen($password) < 6) {
     exit();
 }
 
-$db = (new Database())->getConnection();
+try {
+    $db = (new Database())->getConnection();
 
-// Check if username or email already exists
-$stmt = $db->prepare("SELECT id FROM users WHERE username = :username OR email = :email");
-$stmt->execute(['username' => $username, 'email' => $email]);
+    // Check if username or email already exists
+    $stmt = $db->prepare("SELECT id FROM users WHERE username = :username OR email = :email LIMIT 1");
+    $stmt->execute(['username' => $username, 'email' => $email]);
 
-if ($stmt->fetch()) {
-    http_response_code(409);
-    echo json_encode(["success" => false, "message" => "Username or email is already taken."]);
-    exit();
-}
+    if ($stmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(["success" => false, "message" => "Username or email is already taken."]);
+        exit();
+    }
 
-// Hash password and insert user
-$hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-$stmt = $db->prepare("INSERT INTO users (name, username, email, password) VALUES (:name, :username, :email, :password)");
+    // Hash password and insert user
+    $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+    $stmt = $db->prepare("INSERT INTO users (name, username, email, password) VALUES (:name, :username, :email, :password)");
 
-if ($stmt->execute(['name' => $name, 'username' => $username, 'email' => $email, 'password' => $hashedPassword])) {
-    $userId = $db->lastInsertId();
-    
-    $_SESSION['user_id'] = $userId;
-    $_SESSION['username'] = $username;
-    $_SESSION['name'] = $name;
+    if ($stmt->execute(['name' => $name, 'username' => $username, 'email' => $email, 'password' => $hashedPassword])) {
+        $userId = $db->lastInsertId();
+        
+        // Populate Session
+        $_SESSION['user_id'] = $userId;
+        $_SESSION['username'] = $username;
+        $_SESSION['name'] = $name;
 
-    echo json_encode([
-        "success" => true,
-        "message" => "Registration successful! Welcome to POSTA.",
-        "user" => [
-            "id" => $userId,
-            "name" => $name,
-            "username" => $username,
-            "email" => $email
-        ]
-    ]);
-} else {
+        echo json_encode([
+            "success" => true,
+            "message" => "Registration successful! Welcome to POSTA.",
+            "user" => [
+                "id" => $userId,
+                "name" => $name,
+                "username" => $username,
+                "email" => $email
+            ]
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(["success" => false, "message" => "Registration failed. Try again."]);
+    }
+
+} catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(["success" => false, "message" => "Registration failed. Try again."]);
+    echo json_encode([
+        "success" => false, 
+        "message" => "Server error: " . $e->getMessage()
+    ]);
 }
