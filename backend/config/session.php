@@ -7,7 +7,8 @@ $allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
-    'https://posta-xi-three.vercel.app' // Added Vercel live domain
+    'https://posta-xi-three.vercel.app',
+    'https://scorebook-divinity-bonding.ngrok-free.dev' // Added your active ngrok domain
 ];
 
 $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -21,7 +22,8 @@ if (in_array($requestOrigin, $allowedOrigins, true)) {
 
 header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+// ADDED ngrok-skip-browser-warning to allowed headers below:
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning");
 header("Content-Type: application/json; charset=UTF-8");
 
 // Handle preflight OPTIONS requests immediately
