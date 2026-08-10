@@ -13,7 +13,8 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const res = await api.get('/auth/me.php');
+      // Updated endpoint path to include /api/
+      const res = await api.get('/api/auth/me.php');
       if (res.data.authenticated) {
         setUser(res.data.user);
       } else {
@@ -27,7 +28,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (credentials) => {
-    const res = await api.post('/auth/login.php', credentials);
+    // Updated endpoint path to include /api/
+    const res = await api.post('/api/auth/login.php', credentials);
     if (res.data.success) {
       setUser(res.data.user);
     }
@@ -35,7 +37,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (userData) => {
-    const res = await api.post('/auth/register.php', userData);
+    // Updated endpoint path to include /api/
+    const res = await api.post('/api/auth/register.php', userData);
     if (res.data.success) {
       setUser(res.data.user);
     }
@@ -43,7 +46,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await api.get('/auth/logout.php');
+    // Updated endpoint path to include /api/
+    await api.get('/api/auth/logout.php');
     setUser(null);
   };
 
