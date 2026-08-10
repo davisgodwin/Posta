@@ -36,7 +36,18 @@ export default function Register() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to register.');
+      // Extract detailed network, status, and server response information
+      const status = err.response?.status;
+      const serverMsg = err.response?.data?.message;
+      const genericMsg = err.message || 'Failed to register.';
+      const requestUrl = err.config?.url;
+
+      // Surface precise error details to identify network vs server failures on mobile
+      setError(
+        `Error [Status ${status || 'Network/CORS'}]: ${
+          serverMsg || genericMsg
+        }${requestUrl ? ` (Target: ${requestUrl})` : ''}`
+      );
     } finally {
       setSubmitting(false);
     }
@@ -54,7 +65,7 @@ export default function Register() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-stampRed/10 border border-stampRed/30 text-stampRed text-xs rounded-lg">
+          <div className="mb-4 p-3 bg-stampRed/10 border border-stampRed/30 text-stampRed text-xs rounded-lg break-words">
             {error}
           </div>
         )}
