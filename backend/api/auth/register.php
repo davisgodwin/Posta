@@ -1,30 +1,33 @@
 <?php
-// 1. MUST BE FIRST: Load session and global CORS configuration
+// 1. Session and CORS configuration
 require_once '../../config/session.php';
 require_once '../../config/database.php';
 
-// 2. Allow custom ngrok and frontend headers explicitly for preflights
+// 2. Output JSON Content-Type early & suppress display errors for API clean output
+header("Content-Type: application/json; charset=UTF-8");
+ini_set('display_errors', '0');
+
+// 3. Global CORS Headers
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning");
 
-// 3. Handle OPTIONS preflight immediately
+// 4. Handle OPTIONS preflight immediately
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
-// 4. Ensure request is POST
+// 5. Ensure request method is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(["success" => false, "message" => "Method Not Allowed. Expected POST."]);
     exit();
 }
 
-header("Content-Type: application/json");
-ini_set('display_errors', '0');
-
+// Read raw JSON body
 $data = json_decode(file_get_contents("php://input"), true);
 
-// Fallback check if body wasn't JSON formatted
 if (!$data) {
     http_response_code(400);
     echo json_encode(["success" => false, "message" => "Invalid request payload."]);
@@ -37,7 +40,7 @@ $email = trim($data['email'] ?? '');
 $password = $data['password'] ?? '';
 $confirm_password = $data['confirmPassword'] ?? '';
 
-// Input Validations
+// Validations
 if (empty($name) || empty($username) || empty($email) || empty($password)) {
     http_response_code(400);
     echo json_encode(["success" => false, "message" => "All fields are required."]);
@@ -65,7 +68,7 @@ if (strlen($password) < 6) {
 try {
     $db = (new Database())->getConnection();
 
-    // Check if username or email already exists
+    // Check existing user
     $stmt = $db->prepare("SELECT id FROM users WHERE username = :username OR email = :email LIMIT 1");
     $stmt->execute(['username' => $username, 'email' => $email]);
 
@@ -75,18 +78,18 @@ try {
         exit();
     }
 
-    // Hash password and insert user
+    // Hash password & insert
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
     $stmt = $db->prepare("INSERT INTO users (name, username, email, password) VALUES (:name, :username, :email, :password)");
 
     if ($stmt->execute(['name' => $name, 'username' => $username, 'email' => $email, 'password' => $hashedPassword])) {
         $userId = $db->lastInsertId();
         
-        // Populate Session
         $_SESSION['user_id'] = $userId;
         $_SESSION['username'] = $username;
         $_SESSION['name'] = $name;
 
+        http_response_code(201);
         echo json_encode([
             "success" => true,
             "message" => "Registration successful! Welcome to POSTA.",

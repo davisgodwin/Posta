@@ -1,11 +1,35 @@
 <?php
-require_once '../../config/database.php';
+// 1. Session and CORS configuration
 require_once '../../config/session.php';
+require_once '../../config/database.php';
 
+// 2. Output JSON Content-Type early & suppress error prints
+header("Content-Type: application/json; charset=UTF-8");
+ini_set('display_errors', '0');
+
+// 3. Global CORS Headers
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning");
+
+// 4. Handle OPTIONS preflight immediately
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// 5. Ensure request method is POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(["success" => false, "message" => "Method Not Allowed. Expected POST."]);
+    exit();
+}
+
+// Read raw JSON input
 $data = json_decode(file_get_contents("php://input"), true);
 
 $identifier = trim($data['login'] ?? $data['identifier'] ?? $data['username'] ?? $data['email'] ?? '');
-$password = trim($data['password'] ?? '');
+$password = $data['password'] ?? '';
 
 if (empty($identifier) || empty($password)) {
     http_response_code(400);
@@ -13,11 +37,10 @@ if (empty($identifier) || empty($password)) {
     exit();
 }
 
-$db = (new Database())->getConnection();
-
 try {
-    // Use distinct placeholders :username and :email
-    $stmt = $db->prepare("SELECT id, name, username, email, password FROM users WHERE username = :username OR email = :email");
+    $db = (new Database())->getConnection();
+
+    $stmt = $db->prepare("SELECT id, name, username, email, password FROM users WHERE username = :username OR email = :email LIMIT 1");
     $stmt->execute([
         'username' => $identifier,
         'email'    => $identifier
@@ -28,9 +51,11 @@ try {
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
+        $_SESSION['name'] = $user['name'];
 
         unset($user['password']);
 
+        http_response_code(200);
         echo json_encode([
             "success" => true,
             "message" => "Login successful!",
@@ -40,7 +65,10 @@ try {
         http_response_code(401);
         echo json_encode(["success" => false, "message" => "Invalid email/username or password."]);
     }
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
+    echo json_encode([
+        "success" => false, 
+        "message" => "Database error: " . $e->getMessage()
+    ]);
 }
