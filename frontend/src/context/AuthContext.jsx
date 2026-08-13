@@ -36,14 +36,14 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
-  const register = async (userData) => {
-    // Updated endpoint path to include /api/
-    const res = await api.post('/api/auth/register.php', userData);
-    if (res.data.success) {
-      setUser(res.data.user);
-    }
-    return res.data;
-  };
+const register = async (userData) => {
+  // Use relative path matching your backend directory structure
+  const res = await api.post('api/auth/register.php', userData);
+  if (res.data.success) {
+    setUser(res.data.user);
+  }
+  return res.data;
+}
 
   const logout = async () => {
     // Updated endpoint path to include /api/

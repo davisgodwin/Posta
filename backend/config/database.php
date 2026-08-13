@@ -1,16 +1,28 @@
 <?php
 class Database {
-    private $host = "localhost";
-    private $db_name = "posta_db";
-    private $username = "root";
-    private $password = "";
+    private $host;
+    private $db_name;
+    private $username;
+    private $password;
+    private $port;
     public $conn;
+
+    public function __construct() {
+        // Read environment variables provided by Render, falling back to local defaults
+        $this->host     = getenv('DB_HOST') ?: "localhost";
+        $this->db_name  = getenv('DB_NAME') ?: "posta_db";
+        $this->username = getenv('DB_USER') ?: "root";
+        $this->password = getenv('DB_PASS') ?: "";
+        $this->port     = getenv('DB_PORT') ?: "3306";
+    }
 
     public function getConnection() {
         $this->conn = null;
         try {
+            $dsn = "mysql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name . ";charset=utf8mb4";
+            
             $this->conn = new PDO(
-                "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4",
+                $dsn,
                 $this->username,
                 $this->password,
                 [
