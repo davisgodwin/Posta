@@ -3,7 +3,7 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/favicon.svg'
+  '/posta-favicon.png' // Matches your manifest icon (use '/posta%20favicon.png' if keeping space in name)
 ];
 
 // Install Event - Cache Core Static Assets
@@ -41,7 +41,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 2. Network-first strategy for static UI routes with cache fallback
+  // 2. Network-first strategy with SPA navigation fallback to /index.html
   e.respondWith(
     fetch(e.request)
       .then((response) => {
@@ -54,6 +54,24 @@ self.addEventListener('fetch', (e) => {
         }
         return response;
       })
-      .catch(() => caches.match(e.request))
+      .catch(async () => {
+        // Try returning cached asset first
+        const cachedResponse = await caches.match(e.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        // If it's a page navigation request (like /register), fallback to index.html for React Router
+        if (e.request.mode === 'navigate') {
+          const indexPage = await caches.match('/index.html');
+          if (indexPage) return indexPage;
+        }
+
+        // Return a basic error response if completely offline and asset isn't cached
+        return new Response('Network error occurred', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      })
   );
 });
