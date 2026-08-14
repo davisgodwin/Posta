@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-// Correct backend URL
+// ✅ Correct backend URL
 export const API_BASE_URL = 'https://posta-backend-4820.onrender.com/api';
 
-// Create Axios Instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
@@ -11,14 +10,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
   },
-  params: {
-    'ngrok-skip-browser-warning': 'true',
-  },
 });
-
-// ==========================================
-// AUTHENTICATION API HELPER FUNCTIONS
-// ==========================================
 
 export const registerUser = async (userData) => {
   const response = await api.post('/auth/register.php', userData);
