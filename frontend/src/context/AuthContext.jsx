@@ -13,8 +13,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      // Updated endpoint path to include /api/
-      const res = await api.get('/api/auth/me.php');
+      const res = await api.get('/auth/me.php');
       if (res.data.authenticated) {
         setUser(res.data.user);
       } else {
@@ -28,26 +27,23 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (credentials) => {
-    // Updated endpoint path to include /api/
-    const res = await api.post('/api/auth/login.php', credentials);
+    const res = await api.post('/auth/login.php', credentials);
     if (res.data.success) {
       setUser(res.data.user);
     }
     return res.data;
   };
 
-const register = async (userData) => {
-  // Use relative path matching your backend directory structure
-  const res = await api.post('api/auth/register.php', userData);
-  if (res.data.success) {
-    setUser(res.data.user);
-  }
-  return res.data;
-}
+  const register = async (userData) => {
+    const res = await api.post('/auth/register.php', userData);
+    if (res.data.success) {
+      setUser(res.data.user);
+    }
+    return res.data;
+  };
 
   const logout = async () => {
-    // Updated endpoint path to include /api/
-    await api.get('/api/auth/logout.php');
+    await api.get('/auth/logout.php');
     setUser(null);
   };
 
