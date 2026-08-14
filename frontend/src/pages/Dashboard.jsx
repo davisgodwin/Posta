@@ -111,7 +111,7 @@ export default function Dashboard() {
     if (!content.trim() && !mediaFile) return;
 
     const formData = new FormData();
-    formData.append('content', content);
+    formData.append('content', content.trim());
     formData.append('post_type', postType);
     if (postType === 'time_capsule' && unlockDate) {
       formData.append('unlock_at', unlockDate);
@@ -122,8 +122,12 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
-      // Route to create.php and let Axios handle boundary headers automatically
-      const res = await api.post('/posts/create.php', formData);
+      // Explicitly set header to ensure boundary flags are attached correctly
+      const res = await api.post('/posts/create.php', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       if (res.data.success) {
         setContent('');

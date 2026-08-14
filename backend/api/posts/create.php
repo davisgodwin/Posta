@@ -22,6 +22,18 @@ try {
         exit();
     }
 
+    // Diagnostic check for empty POST and FILES streams
+    if (empty($_POST) && empty($_FILES)) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "The PHP server received zero post parameters.",
+            "debug_raw_input" => file_get_contents("php://input"),
+            "debug_content_type" => $_SERVER['CONTENT_TYPE'] ?? 'unknown'
+        ]);
+        exit();
+    }
+
     // Read traditional form-data string parameters from $_POST global array
     $content = isset($_POST['content']) ? trim($_POST['content']) : '';
     $postType = isset($_POST['post_type']) ? trim($_POST['post_type']) : 'public';
@@ -30,7 +42,7 @@ try {
     $mediaUrl = null;
     $mediaType = 'image';
 
-    // ✅ FIXED VALIDATION: Map files using the frontend parameter 'media'
+    // Map files using the frontend parameter 'media'
     if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
         $fileTmpPath = $_FILES['media']['tmp_name'];
         $fileName = $_FILES['media']['name'];
