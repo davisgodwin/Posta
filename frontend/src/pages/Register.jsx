@@ -32,17 +32,15 @@ export default function Register() {
     setSubmitting(true);
     try {
       const res = await register(formData);
-      if (res.success) {
+      if (res?.success) {
         navigate('/dashboard');
       }
     } catch (err) {
-      // Extract detailed network, status, and server response information
       const status = err.response?.status;
       const serverMsg = err.response?.data?.message;
       const genericMsg = err.message || 'Failed to register.';
       const requestUrl = err.config?.url;
 
-      // Surface precise error details to identify network vs server failures on mobile
       setError(
         `Error [Status ${status || 'Network/CORS'}]: ${
           serverMsg || genericMsg
@@ -154,7 +152,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 bg-ink text-paper text-sm font-semibold rounded-lg hover:bg-ink/90 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-ink text-paper text-sm font-semibold rounded-lg hover:bg-ink/90 transition flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {submitting ? 'Creating Postbox...' : 'Register'}
             <ArrowRight className="w-4 h-4" />

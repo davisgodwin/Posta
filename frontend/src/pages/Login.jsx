@@ -18,11 +18,20 @@ export default function Login() {
 
     try {
       const res = await login({ login: loginInput, password });
-      if (res.success) {
+      if (res?.success) {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email/username or password.');
+      const status = err.response?.status;
+      const serverMsg = err.response?.data?.message;
+      const genericMsg = err.message || 'Invalid email/username or password.';
+      const requestUrl = err.config?.url;
+
+      setError(
+        `Error [Status ${status || 'Network/CORS'}]: ${
+          serverMsg || genericMsg
+        }${requestUrl ? ` (Target: ${requestUrl})` : ''}`
+      );
     } finally {
       setSubmitting(false);
     }
@@ -37,7 +46,7 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-stampRed/10 border border-stampRed/30 text-stampRed text-xs rounded-lg">
+          <div className="mb-4 p-3 bg-stampRed/10 border border-stampRed/30 text-stampRed text-xs rounded-lg break-words">
             {error}
           </div>
         )}
@@ -76,7 +85,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 bg-ink text-paper text-sm font-semibold rounded-lg hover:bg-ink/90 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-ink text-paper text-sm font-semibold rounded-lg hover:bg-ink/90 transition flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {submitting ? 'Unlocking...' : 'Log In'}
             <ArrowRight className="w-4 h-4" />
