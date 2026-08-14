@@ -1,87 +1,106 @@
 <?php
-require_once dirname(__DIR__, 2) . '/config/cors.php'; 
+// Calculate absolute directory math for global configuration loaders safely
+require_once dirname(__DIR__, 2) . '/config/cors.php'; // Handle preflight OPTIONS calls immediately
 require_once dirname(__DIR__, 2) . '/config/session.php';
 require_once dirname(__DIR__, 2) . '/config/database.php';
 
-header("Content-Type: application/json; charset=UTF-8");
-
-$userId = checkAuth();
-if (is_array($userId)) {
-    $userId = $userId['id'] ?? null;
-}
-
-if (!$userId) {
-    http_response_code(401);
-    echo json_encode(["success" => false, "message" => "Session expired. Please log in again."]);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(["success" => false, "message" => "Method Not Allowed. Expected POST."]);
     exit();
 }
 
-// Fallback handling for both Multipart FormData and raw JSON
-$content = $_POST['content'] ?? null;
-if (!$content) {
-    $rawInput = file_get_contents("php://input");
-    $data = json_decode($rawInput, true);
-    $content = trim($data['content'] ?? '');
-}
-
-if (empty($content)) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "Post content cannot be empty."]);
-    exit();
-}
-
-$mediaUrl = null;
-
-// Handle Media File Upload
-if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
-    $uploadDir = dirname(__DIR__, 2) . '/uploads/';
-    
-    if (!file_exists($uploadDir)) {
-        @mkdir($uploadDir, 0777, true);
+try {
+    $userId = checkAuth();
+    if (is_array($userId)) {
+        $userId = $userId['id'];
     }
 
-    $fileTmpPath = $_FILES['media']['tmp_name'];
-    $fileName = $_FILES['media']['name'];
-    $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    if (!$userId) {
+        http_response_code(401);
+        echo json_encode(["success" => false, "message" => "Unauthorized profile session."]);
+        exit();
+    }
+
+    // Read traditional form-data string parameters from $_POST global array
+    $content = isset($_POST['content']) ? trim($_POST['content']) : '';
+    $postType = isset($_POST['post_type']) ? trim($_POST['post_type']) : 'public';
+    $unlockAt = isset($_POST['unlock_at']) ? trim($_POST['unlock_at']) : null;
     
-    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webm'];
-    if (in_array($fileExtension, $allowedExtensions)) {
-        $newFileName = time() . '_' . uniqid() . '.' . $fileExtension;
+    $mediaUrl = null;
+    $mediaType = 'image';
+
+    // ✅ FIXED VALIDATION: Map files using the frontend parameter 'media'
+    if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath = $_FILES['media']['tmp_name'];
+        $fileName = $_FILES['media']['name'];
+        $fileMime = $_FILES['media']['type'];
+        
+        $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'webm'];
+
+        if (!in_array($fileExtension, $allowedExtensions)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Unsupported media format extension Type."]);
+            exit();
+        }
+
+        // Dynamically deduce if the incoming attachment represents a video reel or static image
+        if (strpos($fileMime, 'video/') === 0) {
+            $mediaType = 'video';
+        }
+
+        // Calculate storage directory on the host server relative to the api root
+        $uploadDir = dirname(__DIR__, 2) . '/uploads/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        // Apply cryptographic naming to secure directories against path traversal overrides
+        $newFileName = md5(time() . $fileName) . '.' . $fileExtension;
         $destPath = $uploadDir . $newFileName;
 
         if (move_uploaded_file($fileTmpPath, $destPath)) {
             $mediaUrl = 'uploads/' . $newFileName;
+        } else {
+            throw new Exception("Local container disk operating system write block encountered.");
         }
     }
-}
 
-try {
+    if (empty($content) && empty($mediaUrl)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Cannot publish an empty post entry."]);
+        exit();
+    }
+
     $db = (new Database())->getConnection();
-    $stmt = $db->prepare("INSERT INTO posts (user_id, content, media_url, created_at) VALUES (:user_id, :content, :media_url, NOW())");
+    
+    // Bind structural values securely via parameterized statements
+    $query = "
+        INSERT INTO posts (user_id, content, media_url, media_type, post_type, unlock_at) 
+        VALUES (:user_id, :content, :media_url, :media_type, :post_type, :unlock_at)
+    ";
+    
+    $stmt = $db->prepare($query);
     $stmt->execute([
-        'user_id' => $userId,
-        'content' => $content,
-        'media_url' => $mediaUrl
+        'user_id'    => $userId,
+        'content'    => !empty($content) ? $content : null,
+        'media_url'  => $mediaUrl,
+        'media_type' => $mediaType,
+        'post_type'  => $postType,
+        'unlock_at'  => (!empty($unlockAt) && $postType === 'time_capsule') ? $unlockAt : null
     ]);
 
-    $postId = $db->lastInsertId();
-
-    http_response_code(201);
     echo json_encode([
         "success" => true,
-        "message" => "Post created successfully.",
-        "post_id" => $postId
+        "message" => "Post shared successfully! ✨"
     ]);
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode([
-        "success" => false,
-        "message" => "Database Error: " . $e->getMessage()
-    ]);
+
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode([
-        "success" => false,
-        "message" => "Server Error: " . $e->getMessage()
+        "success" => false, 
+        "message" => "An error occurred while sharing your post.",
+        "debug_error" => $e->getMessage()
     ]);
 }
