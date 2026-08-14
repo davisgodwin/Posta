@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// 1. Read Base URL from Environment or default to local fallback parameters
+// 1. Read Base URL from Environment, falling back safely to local pathing parameters
 const RAW_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost/posta/backend';
 
@@ -15,10 +15,10 @@ const api = axios.create({
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true', // Bypasses interstitial HTML warning blocks on Ngrok
+    'ngrok-skip-browser-warning': 'true', 
   },
   params: {
-    'ngrok-skip-browser-warning': 'true', // Query parameter fallback rule for mobile Safari/Chrome viewports
+    'ngrok-skip-browser-warning': 'true', 
   },
 });
 
@@ -31,10 +31,8 @@ const api = axios.create({
  * @param {Object} userData - { name, username, email, password, confirmPassword }
  */
 export const registerUser = async (userData) => {
-  // ✅ FIXED ROUTING: Ensure the path matches your backend file hierarchy layout perfectly
-  // If your directory contains an extra /api directory nesting level, use '/api/auth/register.php'
-  // If it is inside the root backend folder directly, change it to '/auth/register.php'
-  const response = await api.post('/api/auth/register.php', userData);
+  // ✅ FIXED ROUTING: Stripped duplicate '/api' segment to prevent preflight redirects
+  const response = await api.post('/auth/register.php', userData);
   return response.data;
 };
 
@@ -43,7 +41,8 @@ export const registerUser = async (userData) => {
  * @param {Object} credentials - { login, password }
  */
 export const loginUser = async (credentials) => {
-  const response = await api.post('/api/auth/login.php', credentials);
+  // ✅ FIXED ROUTING: Stripped duplicate '/api' segment to prevent preflight redirects
+  const response = await api.post('/auth/login.php', credentials);
   return response.data;
 };
 

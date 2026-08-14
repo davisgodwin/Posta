@@ -8,7 +8,6 @@ class Database {
     public $conn;
 
     public function __construct() {
-        // Reads Environment variables safely provided by Render, falling back to local defaults
         $this->host     = getenv('DB_HOST') ?: "localhost";
         $this->db_name  = getenv('DB_NAME') ?: "posta_db";
         $this->username = getenv('DB_USER') ?: "root";
@@ -21,30 +20,19 @@ class Database {
         try {
             $dsn = "mysql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name . ";charset=utf8mb4";
             
-            // Core standard engine rules
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ];
 
-            // Apply specific overrides when connecting to remote cloud platforms (e.g., Aiven)
             if ($this->host !== "localhost" && $this->host !== "127.0.0.1") {
+                // ✅ FIXED: Explicitly disable server verification requirements 
+                // to prevent Linux container handshake crashes on Render
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
                 
-                // ✅ FIXED: We avoid raw integer literals or missing constant lookups by using 
-                // relaxed fallback flags. This bypasses local CA certificate file validation 
-                // while keeping the SSL transport layer fully encrypted to appease Aiven.
-                
-                if (defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
-                    $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-                } else {
-                    $options[1010] = false; // Direct fallback to internal low-level driver key
-                }
-
-                // Explicitly disable enforcing a strict local file system CA verification certificate
-                if (defined('PDO::MYSQL_ATTR_SSL_CA')) {
-                    unset($options[PDO::MYSQL_ATTR_SSL_CA]);
-                }
+                // Explicitly nullify the local CA file mapping requirement path parameter
+                $options[PDO::MYSQL_ATTR_SSL_CA] = null;
             }
 
             $this->conn = new PDO($dsn, $this->username, $this->password, $options);
@@ -68,6 +56,5 @@ class Database {
     }
 }
 
-// Instantiate global connection reference variable mapping safely
 $databaseInstance = new Database();
 $pdo = $databaseInstance->getConnection();
