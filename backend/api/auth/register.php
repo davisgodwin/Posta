@@ -1,5 +1,8 @@
 <?php
-if (ob_get_length()) ob_clean();
+// Ensure any open buffers are completely flushed for direct hosting environments
+while (ob_get_level()) {
+    ob_end_clean();
+}
 
 // 1. Dynamic CORS setup for credentials support
 $allowed_origins = [
@@ -26,65 +29,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// 3. ✅ FIXED: Use robust absolute directory math for system configuration dependencies
-require_once dirname(__DIR__, 2) . '/config/session.php';
-require_once dirname(__DIR__, 2) . '/config/database.php';
-
-// 4. Output JSON Content-Type early & suppress display errors for clean output
 header("Content-Type: application/json; charset=UTF-8");
 ini_set('display_errors', '0');
 
-// 5. Ensure request method is POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(["success" => false, "message" => "Method Not Allowed. Expected POST."]);
-    exit();
-}
-
-// Read raw JSON body
-$data = json_decode(file_get_contents("php://input"), true);
-
-if (!$data) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "Invalid request payload."]);
-    exit();
-}
-
-$name = trim($data['name'] ?? '');
-$username = trim($data['username'] ?? '');
-$email = trim($data['email'] ?? '');
-$password = $data['password'] ?? '';
-$confirm_password = $data['confirmPassword'] ?? '';
-
-// Validations
-if (empty($username) || empty($email) || empty($password)) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "All fields are required."]);
-    exit();
-}
-
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "Invalid email format."]);
-    exit();
-}
-
-if ($password !== $confirm_password) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "Passwords do not match."]);
-    exit();
-}
-
-if (strlen($password) < 6) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "Password must be at least 6 characters long."]);
-    exit();
-}
-
 try {
+    // 3. ✅ LINUX CASE-SENSITIVE FALLBACK ROUTING ENGINE
+    $baseConfigDir = dirname(__DIR__, 2) . '/config/';
+
+    // Resolve session configuration file name
+    if (file_exists($baseConfigDir . 'session.php')) {
+        require_once $baseConfigDir . 'session.php';
+    } else {
+        require_once $baseConfigDir . 'Session.php';
+    }
+
+    // Resolve database connection file name
+    if (file_exists($baseConfigDir . 'database.php')) {
+        require_once $baseConfigDir . 'database.php';
+    } else if (file_exists($baseConfigDir . 'Database.php')) {
+        require_once $baseConfigDir . 'Database.php';
+    } else if (file_exists($baseConfigDir . 'db.php')) {
+        require_once $baseConfigDir . 'db.php';
+    } else {
+        throw new Exception("Core database configuration file could not be resolved in the config layout folder structure.");
+    }
+
+    // 4. Ensure request method is POST
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(["success" => false, "message" => "Method Not Allowed. Expected POST."]);
+        exit();
+    }
+
+    // Read raw JSON body
+    $data = json_decode(file_get_contents("php://input"), true);
+    if (!$data) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Invalid request payload."]);
+        exit();
+    }
+
+    $username = trim($data['username'] ?? '');
+    $email = trim($data['email'] ?? '');
+    $password = $data['password'] ?? '';
+    $confirm_password = $data['confirmPassword'] ?? '';
+
+    // Validations
+    if (empty($username) || empty($email) || empty($password)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "All fields are required."]);
+        exit();
+    }
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Invalid email format."]);
+        exit();
+    }
+
+    if ($password !== $confirm_password) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Passwords do not match."]);
+        exit();
+    }
+
+    if (strlen($password) < 6) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Password must be at least 6 characters long."]);
+        exit();
+    }
+
+    // 5. Connect and execute
     $db = (new Database())->getConnection();
 
-    // Check existing user records
+    // Check existing user
     $stmt = $db->prepare("SELECT id FROM users WHERE username = :username OR email = :email LIMIT 1");
     $stmt->execute(['username' => $username, 'email' => $email]);
 
@@ -95,8 +113,6 @@ try {
     }
 
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-
-    // ✅ FIXED QUERY: Removed the missing 'name' column entry parameter to prevent 500 SQL failure crashes
     $stmt = $db->prepare("INSERT INTO users (username, email, password) VALUES (:username, :email, :password)");
     $executionResult = $stmt->execute([
         'username' => $username, 
@@ -107,6 +123,9 @@ try {
     if ($executionResult) {
         $userId = $db->lastInsertId();
         
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
         $_SESSION['user_id'] = $userId;
         $_SESSION['username'] = $username;
 
@@ -126,7 +145,7 @@ try {
     }
 
 } catch (Throwable $e) {
-    // Keep exact system runtime output trace logging visible during this development sync phase
+    // Keep error description visible for dev tools monitoring logs
     http_response_code(500);
     echo json_encode([
         "success" => false, 
