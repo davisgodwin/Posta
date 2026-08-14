@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       const res = await api.get('/auth/me.php');
-      if (res.data.authenticated) {
+      if (res.data.authenticated || res.data.success) {
         setUser(res.data.user);
       } else {
         setUser(null);

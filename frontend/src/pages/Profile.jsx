@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { 
   Camera, MapPin, Globe, Calendar, 
   Edit3, MessageSquare, Heart, Loader2, 
@@ -7,8 +8,9 @@ import {
 } from 'lucide-react';
 
 const Profile = () => {
+  const { user: authUser } = useAuth();
   const [activeTab, setActiveTab] = useState('timeline');
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(authUser || null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -27,13 +29,20 @@ const Profile = () => {
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
 
+  const getMediaUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const baseURL = api.defaults.baseURL || 'https://posta-backend-4820.onrender.com';
+    return `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  };
+
   useEffect(() => {
     fetchProfileData();
   }, []);
 
   const fetchProfileData = async () => {
     try {
-      const res = await axios.get('http://localhost/posta/backend/api/profile/get.php', { withCredentials: true });
+      const res = await api.get('/profile/get.php');
       if (res.data.success) {
         const u = res.data.user;
         setUser(u);
@@ -43,12 +52,12 @@ const Profile = () => {
           location: u.location || '',
           website: u.website || '',
         });
-        if (u.avatar) setAvatarPreview(`http://localhost/posta/backend/${u.avatar}`);
-        if (u.cover_photo) setCoverPreview(`http://localhost/posta/backend/${u.cover_photo}`);
+        if (u.avatar) setAvatarPreview(getMediaUrl(u.avatar));
+        if (u.cover_photo) setCoverPreview(getMediaUrl(u.cover_photo));
       }
 
-      const postsRes = await axios.get('http://localhost/posta/backend/api/posts/index.php', { withCredentials: true });
-      if (postsRes.data.success) {
+      const postsRes = await api.get('/posts/index.php');
+      if (postsRes.data.success && res.data.user) {
         setPosts(postsRes.data.posts.filter(p => p.user_id === res.data.user.id));
       }
     } catch (err) {
@@ -58,17 +67,11 @@ const Profile = () => {
     }
   };
 
-  // Delete Post Handler
   const handleDeletePost = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
 
     try {
-      const res = await axios.post(
-        'http://localhost/posta/backend/api/posts/delete.php',
-        { post_id: postId },
-        { withCredentials: true }
-      );
-
+      const res = await api.post('/posts/delete.php', { post_id: postId });
       if (res.data.success) {
         setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
       } else {
@@ -82,11 +85,7 @@ const Profile = () => {
 
   const handleLikeToggle = async (postId) => {
     try {
-      const res = await axios.post(
-        'http://localhost/posta/backend/api/likes/toggle.php',
-        { post_id: postId },
-        { withCredentials: true }
-      );
+      const res = await api.post('/likes/toggle.php', { post_id: postId });
       if (res.data.success) {
         setPosts(prevPosts =>
           prevPosts.map(post => {
@@ -110,9 +109,7 @@ const Profile = () => {
   const fetchComments = async (postId) => {
     setLoadingComments(prev => ({ ...prev, [postId]: true }));
     try {
-      const res = await axios.get(`http://localhost/posta/backend/api/comments/index.php?post_id=${postId}`, {
-        withCredentials: true
-      });
+      const res = await api.get(`/comments/index.php?post_id=${postId}`);
       if (res.data.success) {
         setCommentsMap(prev => ({ ...prev, [postId]: res.data.comments }));
       }
@@ -140,12 +137,7 @@ const Profile = () => {
     if (!commentText) return;
 
     try {
-      const res = await axios.post(
-        'http://localhost/posta/backend/api/comments/create.php',
-        { post_id: postId, comment: commentText },
-        { withCredentials: true }
-      );
-
+      const res = await api.post('/comments/create.php', { post_id: postId, comment: commentText });
       if (res.data.success) {
         setCommentInputs(prev => ({ ...prev, [postId]: '' }));
         fetchComments(postId);
@@ -182,8 +174,7 @@ const Profile = () => {
     if (coverFile) data.append('cover_photo', coverFile);
 
     try {
-      const res = await axios.post('http://localhost/posta/backend/api/profile/update.php', data, {
-        withCredentials: true,
+      const res = await api.post('/profile/update.php', data, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (res.data.success) {
@@ -323,7 +314,6 @@ const Profile = () => {
               ) : (
                 posts.map((post) => (
                   <div key={post.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-3">
-                    {/* Header: Avatar, Name, and Delete Button */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center font-bold text-gray-600">
@@ -335,7 +325,6 @@ const Profile = () => {
                         </div>
                       </div>
 
-                      {/* Delete Option */}
                       <button
                         onClick={() => handleDeletePost(post.id)}
                         className="p-1.5 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100 transition"
@@ -345,17 +334,14 @@ const Profile = () => {
                       </button>
                     </div>
                     
-                    {/* Body Text */}
                     <p className="text-sm text-gray-800">{post.content}</p>
 
-                    {/* Media */}
                     {post.media_url && (
                       <div className="rounded-lg overflow-hidden max-h-96 bg-black flex items-center justify-center">
-                        <img src={`http://localhost/posta/backend/${post.media_url}`} alt="Post content" className="object-cover max-h-96 w-full" />
+                        <img src={getMediaUrl(post.media_url)} alt="Post content" className="object-cover max-h-96 w-full" />
                       </div>
                     )}
 
-                    {/* Feed Style Footer: Left Actions + Right Timestamp */}
                     <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-4 text-xs text-gray-500">
                         <button 
@@ -380,7 +366,6 @@ const Profile = () => {
                       </span>
                     </div>
 
-                    {/* Collapsible Comments */}
                     {activeCommentPostId === post.id && (
                       <div className="pt-3 border-t border-gray-100 space-y-3">
                         <form onSubmit={(e) => handleAddComment(e, post.id)} className="flex items-center gap-2">
