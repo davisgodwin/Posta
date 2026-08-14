@@ -4,9 +4,9 @@ import axios from 'axios';
 const RAW_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost/posta/backend';
 
-// 2. Sanitize: Remove inadvertent brackets, quotes, and trailing slashes
+// 2. Sanitize: Remove brackets [], parentheses (), quotes, and trailing slashes
 export const API_BASE_URL = RAW_BASE_URL
-  .replace(/[\[\]'"]/g, '')
+  .replace(/[\[\]\(\)'"]/g, '')
   .replace(/\/+$/, '');
 
 // 3. Create Axios Instance
