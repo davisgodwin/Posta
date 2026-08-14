@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { Clock, Send, Lock, Unlock, Sparkles, Image, Video, X, Heart, MessageSquare, Volume2, VolumeX } from 'lucide-react';
 
+const BASE_URL = 'http://localhost/posta/backend';
+
 // Dedicated Reel Video Component for Autoplay & Vertical Layout
 function ReelVideo({ src }) {
   const videoRef = useRef(null);
@@ -85,7 +87,7 @@ export default function Dashboard() {
     try {
       const res = await api.get('/posts/index.php');
       if (res.data.success) {
-        setPosts(res.data.posts);
+        setPosts(res.data.posts || []);
       }
     } catch (err) {
       console.error('Failed to load feed', err);
@@ -122,7 +124,6 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
-      // Explicitly set header to ensure boundary flags are attached correctly
       const res = await api.post('/posts/create.php', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -159,7 +160,7 @@ export default function Dashboard() {
               return {
                 ...p,
                 user_liked: liked ? 1 : 0,
-                likes_count: liked ? Number(p.likes_count) + 1 : Number(p.likes_count) - 1,
+                likes_count: liked ? Number(p.likes_count) + 1 : Math.max(0, Number(p.likes_count) - 1),
               };
             }
             return p;
@@ -224,7 +225,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gold/20 border border-gold flex items-center justify-center overflow-hidden font-bold font-serif text-ink">
             {user?.avatar ? (
-              <img src={`http://localhost/posta/backend/${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
+              <img src={`${BASE_URL}/${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               user?.name?.charAt(0).toUpperCase()
             )}
@@ -338,143 +339,149 @@ export default function Dashboard() {
           <Sparkles className="w-4 h-4 text-gold" /> Posta Feed
         </h2>
 
-        {posts.map((post) => {
-          const isLocked =
-            post.post_type === 'time_capsule' &&
-            new Date(post.unlock_at) > new Date();
-          const isOwner = user?.id === post.user_id;
+        {posts.length === 0 ? (
+          <div className="bg-paper border border-envelope rounded-2xl p-8 text-center text-ink/50 text-xs">
+            No posts found. Share a memory to start the feed!
+          </div>
+        ) : (
+          posts.map((post) => {
+            const isLocked =
+              post.post_type === 'time_capsule' &&
+              new Date(post.unlock_at) > new Date();
+            const isOwner = String(user?.id) === String(post.user_id);
 
-          return (
-            <div key={post.id} className="bg-paper border border-envelope/80 rounded-2xl p-4 shadow-sm space-y-3">
-              {/* Author Bar */}
-              <div className="flex items-center justify-between">
-                <Link to={`/user/${post.username}`} className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold flex items-center justify-center overflow-hidden text-xs font-bold font-serif text-ink">
-                    {post.avatar ? (
-                      <img src={`http://localhost/posta/backend/${post.avatar}`} alt={post.name} className="w-full h-full object-cover" />
-                    ) : (
-                      post.name?.charAt(0).toUpperCase()
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-ink hover:underline">{post.name}</p>
-                    <p className="text-[10px] text-ink/50">@{post.username}</p>
-                  </div>
-                </Link>
-
-                {post.post_type === 'time_capsule' && (
-                  <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold flex items-center gap-1 ${
-                    isLocked ? 'bg-stampRed/10 text-stampRed border-stampRed/30' : 'bg-gold/20 text-ink border-gold/40'
-                  }`}>
-                    {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                    {isLocked ? `Unlocks ${new Date(post.unlock_at).toLocaleDateString()}` : 'Time Capsule Unlocked'}
-                  </span>
-                )}
-              </div>
-
-              {/* Content / Media */}
-              {isLocked && !isOwner ? (
-                <div className="p-4 bg-envelope/30 border border-dashed border-envelope rounded-xl text-center space-y-1">
-                  <Lock className="w-6 h-6 text-ink/40 mx-auto" />
-                  <p className="text-xs font-semibold text-ink/60">This Time Capsule is sealed</p>
-                  <p className="text-[11px] text-ink/40">
-                    Unlocks on {new Date(post.unlock_at).toLocaleString()}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {post.content && (
-                    <p className="text-sm text-ink/90 font-sans leading-relaxed">{post.content}</p>
-                  )}
-
-                  {post.media_url && (
-                    <div>
-                      {post.media_type === 'video' ? (
-                        <ReelVideo src={`http://localhost/posta/backend/${post.media_url}`} />
+            return (
+              <div key={post.id} className="bg-paper border border-envelope/80 rounded-2xl p-4 shadow-sm space-y-3">
+                {/* Author Bar */}
+                <div className="flex items-center justify-between">
+                  <Link to={`/user/${post.username}`} className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold flex items-center justify-center overflow-hidden text-xs font-bold font-serif text-ink">
+                      {post.avatar ? (
+                        <img src={`${BASE_URL}/${post.avatar}`} alt={post.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="rounded-xl overflow-hidden border border-envelope/60 bg-black/5 flex justify-center">
-                          <img
-                            src={`http://localhost/posta/backend/${post.media_url}`}
-                            alt="Post attachment"
-                            className="w-full max-h-96 object-cover rounded-xl"
-                          />
-                        </div>
+                        post.name?.charAt(0).toUpperCase()
                       )}
                     </div>
+                    <div>
+                      <p className="text-xs font-bold text-ink hover:underline">{post.name}</p>
+                      <p className="text-[10px] text-ink/50">@{post.username}</p>
+                    </div>
+                  </Link>
+
+                  {post.post_type === 'time_capsule' && (
+                    <span className={`text-[10px] px-2 py-1 rounded-full border font-semibold flex items-center gap-1 ${
+                      isLocked ? 'bg-stampRed/10 text-stampRed border-stampRed/30' : 'bg-gold/20 text-ink border-gold/40'
+                    }`}>
+                      {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                      {isLocked ? `Unlocks ${new Date(post.unlock_at).toLocaleDateString()}` : 'Time Capsule Unlocked'}
+                    </span>
                   )}
                 </div>
-              )}
 
-              {/* Actions Bar: Like & Comment Controls */}
-              <div className="pt-2 border-t border-envelope/40 flex items-center justify-between text-xs text-ink/60">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => handleLike(post.id)}
-                    className={`flex items-center gap-1.5 transition ${
-                      post.user_liked ? 'text-stampRed font-semibold' : 'hover:text-ink'
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 ${post.user_liked ? 'fill-stampRed text-stampRed' : ''}`} />
-                    <span>{post.likes_count || 0}</span>
-                  </button>
+                {/* Content / Media */}
+                {isLocked && !isOwner ? (
+                  <div className="p-4 bg-envelope/30 border border-dashed border-envelope rounded-xl text-center space-y-1">
+                    <Lock className="w-6 h-6 text-ink/40 mx-auto" />
+                    <p className="text-xs font-semibold text-ink/60">This Time Capsule is sealed</p>
+                    <p className="text-[11px] text-ink/40">
+                      Unlocks on {new Date(post.unlock_at).toLocaleString()}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {post.content && (
+                      <p className="text-sm text-ink/90 font-sans leading-relaxed">{post.content}</p>
+                    )}
 
-                  <button
-                    onClick={() => toggleComments(post.id)}
-                    className="flex items-center gap-1.5 hover:text-ink transition"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{post.comments_count || 0}</span>
-                  </button>
-                </div>
-
-                <span className="text-[10px] text-ink/40">{new Date(post.created_at).toLocaleString()}</span>
-              </div>
-
-              {/* Comment Thread */}
-              {activeCommentsPostId === post.id && (
-                <div className="pt-2 space-y-3 border-t border-dashed border-envelope">
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {(commentsMap[post.id] || []).length === 0 ? (
-                      <p className="text-[11px] text-ink/40 italic">No comments yet. Be the first to comment!</p>
-                    ) : (
-                      commentsMap[post.id].map((c) => (
-                        <div key={c.id} className="flex gap-2 text-xs bg-envelope/20 p-2 rounded-xl border border-envelope/40">
-                          <div className="w-6 h-6 rounded-full bg-gold/20 border border-gold flex items-center justify-center shrink-0 font-bold text-[10px]">
-                            {c.avatar ? (
-                              <img src={`http://localhost/posta/backend/${c.avatar}`} alt={c.name} className="w-full h-full object-cover rounded-full" />
-                            ) : (
-                              c.name?.charAt(0).toUpperCase()
-                            )}
+                    {post.media_url && (
+                      <div>
+                        {post.media_type === 'video' ? (
+                          <ReelVideo src={`${BASE_URL}/${post.media_url}`} />
+                        ) : (
+                          <div className="rounded-xl overflow-hidden border border-envelope/60 bg-black/5 flex justify-center">
+                            <img
+                              src={`${BASE_URL}/${post.media_url}`}
+                              alt="Post attachment"
+                              className="w-full max-h-96 object-cover rounded-xl"
+                            />
                           </div>
-                          <div>
-                            <span className="font-bold text-ink mr-1.5">{c.name}</span>
-                            <span className="text-ink/80">{c.comment}</span>
-                          </div>
-                        </div>
-                      ))
+                        )}
+                      </div>
                     )}
                   </div>
+                )}
 
-                  <form onSubmit={(e) => handleAddComment(e, post.id)} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Write a comment..."
-                      value={commentInputs[post.id] || ''}
-                      onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
-                      className="flex-1 bg-paper border border-envelope text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold text-ink"
-                    />
+                {/* Actions Bar: Like & Comment Controls */}
+                <div className="pt-2 border-t border-envelope/40 flex items-center justify-between text-xs text-ink/60">
+                  <div className="flex items-center gap-4">
                     <button
-                      type="submit"
-                      className="px-3 py-1.5 bg-ink text-paper text-xs font-semibold rounded-xl hover:bg-gold hover:text-ink transition flex items-center gap-1"
+                      onClick={() => handleLike(post.id)}
+                      className={`flex items-center gap-1.5 transition ${
+                        post.user_liked ? 'text-stampRed font-semibold' : 'hover:text-ink'
+                      }`}
                     >
-                      <Send className="w-3 h-3" /> Send
+                      <Heart className={`w-4 h-4 ${post.user_liked ? 'fill-stampRed text-stampRed' : ''}`} />
+                      <span>{post.likes_count || 0}</span>
                     </button>
-                  </form>
+
+                    <button
+                      onClick={() => toggleComments(post.id)}
+                      className="flex items-center gap-1.5 hover:text-ink transition"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>{post.comments_count || 0}</span>
+                    </button>
+                  </div>
+
+                  <span className="text-[10px] text-ink/40">{new Date(post.created_at).toLocaleString()}</span>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {/* Comment Thread */}
+                {activeCommentsPostId === post.id && (
+                  <div className="pt-2 space-y-3 border-t border-dashed border-envelope">
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {(commentsMap[post.id] || []).length === 0 ? (
+                        <p className="text-[11px] text-ink/40 italic">No comments yet. Be the first to comment!</p>
+                      ) : (
+                        commentsMap[post.id].map((c) => (
+                          <div key={c.id} className="flex gap-2 text-xs bg-envelope/20 p-2 rounded-xl border border-envelope/40">
+                            <div className="w-6 h-6 rounded-full bg-gold/20 border border-gold flex items-center justify-center shrink-0 font-bold text-[10px]">
+                              {c.avatar ? (
+                                <img src={`${BASE_URL}/${c.avatar}`} alt={c.name} className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                c.name?.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-bold text-ink mr-1.5">{c.name}</span>
+                              <span className="text-ink/80">{c.comment}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <form onSubmit={(e) => handleAddComment(e, post.id)} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Write a comment..."
+                        value={commentInputs[post.id] || ''}
+                        onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                        className="flex-1 bg-paper border border-envelope text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold text-ink"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 bg-ink text-paper text-xs font-semibold rounded-xl hover:bg-gold hover:text-ink transition flex items-center gap-1"
+                      >
+                        <Send className="w-3 h-3" /> Send
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
