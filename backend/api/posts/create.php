@@ -12,11 +12,11 @@ if (is_array($userId)) {
 
 if (!$userId) {
     http_response_code(401);
-    echo json_encode(["success" => false, "message" => "Unauthorized. Please log in."]);
+    echo json_encode(["success" => false, "message" => "Session expired. Please log in again."]);
     exit();
 }
 
-// Retrieve post content from either FormData ($_POST) or JSON body
+// Fallback handling for both Multipart FormData and raw JSON
 $content = $_POST['content'] ?? null;
 if (!$content) {
     $rawInput = file_get_contents("php://input");
@@ -32,11 +32,12 @@ if (empty($content)) {
 
 $mediaUrl = null;
 
-// Handle File Uploads (Images/Videos)
+// Handle Media File Upload
 if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
     $uploadDir = dirname(__DIR__, 2) . '/uploads/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
+    
+    if (!file_exists($uploadDir)) {
+        @mkdir($uploadDir, 0777, true);
     }
 
     $fileTmpPath = $_FILES['media']['tmp_name'];
@@ -45,7 +46,7 @@ if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
     
     $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webm'];
     if (in_array($fileExtension, $allowedExtensions)) {
-        $newFileName = md5(time() . $fileName) . '.' . $fileExtension;
+        $newFileName = time() . '_' . uniqid() . '.' . $fileExtension;
         $destPath = $uploadDir . $newFileName;
 
         if (move_uploaded_file($fileTmpPath, $destPath)) {
@@ -71,10 +72,16 @@ try {
         "message" => "Post created successfully.",
         "post_id" => $postId
     ]);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode([
+        "success" => false,
+        "message" => "Database Error: " . $e->getMessage()
+    ]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode([
         "success" => false,
-        "message" => "Database error: " . $e->getMessage()
+        "message" => "Server Error: " . $e->getMessage()
     ]);
 }

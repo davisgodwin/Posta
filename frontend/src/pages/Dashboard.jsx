@@ -122,16 +122,22 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
-      await api.post('/posts/index.php', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setContent('');
-      setUnlockDate('');
-      setPostType('public');
-      clearMedia();
-      fetchFeed();
+      // Route to create.php and let Axios handle boundary headers automatically
+      const res = await api.post('/posts/create.php', formData);
+
+      if (res.data.success) {
+        setContent('');
+        setUnlockDate('');
+        setPostType('public');
+        clearMedia();
+        fetchFeed();
+      } else {
+        alert(res.data.message || 'Failed to share post');
+      }
     } catch (err) {
-      alert('Failed to share post');
+      console.error('Post submission error:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to share post';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
