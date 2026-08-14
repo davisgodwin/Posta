@@ -1,4 +1,6 @@
 <?php
+if (ob_get_length()) ob_clean();
+
 // 1. Dynamic CORS setup for credentials support
 $allowed_origins = [
     'https://posta-q21g.onrender.com',
@@ -24,9 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// 3. Session and Database configuration
-require_once '../../config/session.php';
-require_once '../../config/database.php';
+// 3. ✅ FIXED: Use robust absolute directory math for system configuration dependencies
+require_once dirname(__DIR__, 2) . '/config/session.php';
+require_once dirname(__DIR__, 2) . '/config/database.php';
 
 // 4. Output JSON Content-Type early & suppress display errors for clean output
 header("Content-Type: application/json; charset=UTF-8");
@@ -55,7 +57,7 @@ $password = $data['password'] ?? '';
 $confirm_password = $data['confirmPassword'] ?? '';
 
 // Validations
-if (empty($name) || empty($username) || empty($email) || empty($password)) {
+if (empty($username) || empty($email) || empty($password)) {
     http_response_code(400);
     echo json_encode(["success" => false, "message" => "All fields are required."]);
     exit();
@@ -82,7 +84,7 @@ if (strlen($password) < 6) {
 try {
     $db = (new Database())->getConnection();
 
-    // Check existing user
+    // Check existing user records
     $stmt = $db->prepare("SELECT id FROM users WHERE username = :username OR email = :email LIMIT 1");
     $stmt->execute(['username' => $username, 'email' => $email]);
 
@@ -92,16 +94,21 @@ try {
         exit();
     }
 
-    // Hash password & insert
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-    $stmt = $db->prepare("INSERT INTO users (name, username, email, password) VALUES (:name, :username, :email, :password)");
 
-    if ($stmt->execute(['name' => $name, 'username' => $username, 'email' => $email, 'password' => $hashedPassword])) {
+    // ✅ FIXED QUERY: Removed the missing 'name' column entry parameter to prevent 500 SQL failure crashes
+    $stmt = $db->prepare("INSERT INTO users (username, email, password) VALUES (:username, :email, :password)");
+    $executionResult = $stmt->execute([
+        'username' => $username, 
+        'email'    => $email, 
+        'password' => $hashedPassword
+    ]);
+
+    if ($executionResult) {
         $userId = $db->lastInsertId();
         
         $_SESSION['user_id'] = $userId;
         $_SESSION['username'] = $username;
-        $_SESSION['name'] = $name;
 
         http_response_code(201);
         echo json_encode([
@@ -109,7 +116,6 @@ try {
             "message" => "Registration successful! Welcome to POSTA.",
             "user" => [
                 "id" => $userId,
-                "name" => $name,
                 "username" => $username,
                 "email" => $email
             ]
@@ -120,6 +126,7 @@ try {
     }
 
 } catch (Throwable $e) {
+    // Keep exact system runtime output trace logging visible during this development sync phase
     http_response_code(500);
     echo json_encode([
         "success" => false, 

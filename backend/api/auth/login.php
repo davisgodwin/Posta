@@ -1,4 +1,6 @@
 <?php
+if (ob_get_length()) ob_clean();
+
 // 1. Dynamic CORS setup for credentials support
 $allowed_origins = [
     'https://posta-q21g.onrender.com',
@@ -24,9 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// 3. Session and Database configuration
-require_once '../../config/session.php';
-require_once '../../config/database.php';
+// 3. ✅ FIXED: Absolute directory math avoids broken file configuration dependencies
+require_once dirname(__DIR__, 2) . '/config/session.php';
+require_once dirname(__DIR__, 2) . '/config/database.php';
 
 // 4. Output JSON Content-Type early & suppress error prints
 header("Content-Type: application/json; charset=UTF-8");
@@ -54,7 +56,8 @@ if (empty($identifier) || empty($password)) {
 try {
     $db = (new Database())->getConnection();
 
-    $stmt = $db->prepare("SELECT id, name, username, email, password FROM users WHERE username = :username OR email = :email LIMIT 1");
+    // ✅ FIXED SQL: Stripped the missing 'name' field out to prevent the 500 error crash
+    $stmt = $db->prepare("SELECT id, username, email, password FROM users WHERE username = :username OR email = :email LIMIT 1");
     $stmt->execute([
         'username' => $identifier,
         'email'    => $identifier
@@ -65,7 +68,6 @@ try {
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
-        $_SESSION['name'] = $user['name'];
 
         unset($user['password']);
 
